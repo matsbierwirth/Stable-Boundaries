@@ -19,25 +19,60 @@ typedef boost::graph_traits<graph>::vertex_descriptor		vertex_desc;
 typedef boost::graph_traits<graph>::adjacency_iterator adj_it;		
 typedef boost::graph_traits<graph>::edge_iterator edge_it;
 
+string coloringMethod ="";
 
-vector<int> generateColors(int n, int seed) {
+vector<int> generate_colors_random(int n, int seed) {
+    coloringMethod = "rand";
     std::mt19937 rng(seed); 
     std::uniform_int_distribution<int> dist(0, 1); 
     
-    std::vector<int> random_numbers;
+    std::vector<int> colors;
     for (int i = 0; i < n; ++i) {
-        random_numbers.push_back(dist(rng));
+        colors.push_back(dist(rng));
     }
-    return random_numbers;
+    return colors;
 }
-void drawGraph(string filename){
+
+
+vector<int> generate_colors_heavy(int n, const std::vector<double>& weights) {
+    coloringMethod = "heavy";
+    std::vector<int> colors;
+    for (int i = 0; i < n; ++i) {
+        if(weights[i]*weights[i] > n){
+            colors.push_back(0);
+        }else{
+            colors.push_back(1);
+        }
+    }
+    return colors;
+}
+
+vector<int> generate_colors_location(int n, int seed, double radius, const std::vector<std::vector<double>>& pos) {
+    coloringMethod = "loc";
+    std::mt19937 rng(seed); 
+    std::uniform_int_distribution<int> dist(0, n); 
+
+    int v = dist(rng);
+
+    std::vector<int> colors;
+    for (int i = 0; i < n; ++i) {
+
+        if((abs(pos[i][0]-pos[v][0])<radius || 1-abs(pos[i][0]-pos[v][0])<radius) && (abs(pos[i][1]-pos[v][1])<radius || 1-abs(pos[i][1]-pos[v][1])<radius) ){
+            colors.push_back(0);
+        }else{
+            colors.push_back(1);
+        }
+    }
+    return colors;
+}
+
+
+void draw_graph(string filename){
     std::string command = "python3.11 graphDrawing.py " +  filename;
     system(command.c_str());
 }
 
-
-
-void saveGraphToFile(const graph& g, const std::vector<std::vector<double>>& pos, const std::vector<double>& weights, const std::vector<int>& colors,
+void save_graph_to_file(const graph& g, const std::vector<std::vector<double>>& pos, const std::vector<double>& weights, const std::vector<int>& colors,
                     double tau, double alpha, int seed, int iter) {
 
     auto num_vertices = boost::num_vertices(g);
@@ -50,7 +85,7 @@ void saveGraphToFile(const graph& g, const std::vector<std::vector<double>>& pos
     }();
     auto foldername2 = [&]() {
         std::ostringstream oss;
-        oss << "seed=" << seed;
+        oss << "col=" << coloringMethod <<  "_seed=" << seed;
         return oss.str();
     }();
     auto base_path = "graph_data/" + foldername1 + "/" + foldername2;
@@ -88,12 +123,10 @@ void saveGraphToFile(const graph& g, const std::vector<std::vector<double>>& pos
     // Close the file
     file.close();
     std::cout << "Graph data saved to " << file_path << "\n";
-    drawGraph(file_path);
+    draw_graph(file_path);
 }
 
-
-
-void singleVertexAllNeighbours(graph& g, const std::vector<std::vector<double>>& pos, const std::vector<double>& weights, 
+void single_vertex_all_neighbours(graph& g, const std::vector<std::vector<double>>& pos, const std::vector<double>& weights, 
                                 std::vector<int> col, std::vector<int> neighbour_col, std::vector<int> iterations, 
                                 double tau, double alpha, int aseed) {
     std::mt19937 rng(aseed); 
@@ -111,7 +144,7 @@ void singleVertexAllNeighbours(graph& g, const std::vector<std::vector<double>>&
     }
 
     int iter = 0;
-    //saveGraphToFile(g, pos, weights, col, tau, alpha, aseed-4, iter);
+    save_graph_to_file(g, pos, weights, col, tau, alpha, aseed-4, iter);
 
     while(flipable.size()!=0){
         //Draw new vertices until one 
@@ -149,14 +182,14 @@ void singleVertexAllNeighbours(graph& g, const std::vector<std::vector<double>>&
 
             //cout << flipable.size() << endl;
             if (std::find(iterations.begin(), iterations.end(), iter) != iterations.end()) {
-                saveGraphToFile(g, pos, weights, col, tau, alpha, aseed-4, iter);
+                save_graph_to_file(g, pos, weights, col, tau, alpha, aseed-4, iter);
             }
         }
 
         
         
     }
-    saveGraphToFile(g, pos, weights, col, tau, alpha, aseed-4, iter);
+    save_graph_to_file(g, pos, weights, col, tau, alpha, aseed-4, iter);
     cout << "No changes are possible after iteration " << iter << ". Program terminates." << endl;
 
 }
@@ -166,7 +199,7 @@ int main()
     int n = 10000;
     //vector<int> iterations = {1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000};
     vector<int> iterations = {};
-    for(int i=1; i<1000; i++){
+    for(int i=999; i<1000; i++){
 
         int dim = 2;
         double tau = 2000+i;
@@ -204,7 +237,7 @@ int main()
             boost::add_edge(e.first, e.second, g); 
         }
         cout << "Edge count " << edges.size() << endl;
-        vector<int> col = generateColors(n, cseed);
+        vector<int> col = generate_colors_location(n, cseed, 0.25, pos);
 
 
         vector<int>  neighbour_col(boost::num_vertices(g), 0);
@@ -225,21 +258,8 @@ int main()
             }
         }
 
-        singleVertexAllNeighbours(g, pos, weights, col, neighbour_col, iterations, tau, alpha, aseed);
+        single_vertex_all_neighbours(g, pos, weights, col, neighbour_col, iterations, tau, alpha, aseed);
 
     }
-    // cout << "Finished initial" << endl;
-    // int totalIterations =0;
-    // for(int i : iterations){
-    //     totalIterations+=i;
-    //     col = singleVertexAllNeighbours(g, col, i, aseed);
-    //     aseed+=1;
-    //     filename = "seed_"+to_string(pseed) +"_elements_"+ to_string(n) +"_iteration_" + to_string(totalIterations) + ".png";
-    //     //cout << filename;
-    //     //if(totalIterations>1000000) 
-    //     drawGraph(g, pos, weights, col, filename);
-    //     cout << "Finished iteration " << to_string(totalIterations) << endl;
-    // }
-    
 
 }
