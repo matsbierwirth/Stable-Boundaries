@@ -50,14 +50,18 @@ vector<int> generate_colors_heavy(int n, const std::vector<double>& weights) {
 vector<int> generate_colors_location(int n, int seed, double radius, const std::vector<std::vector<double>>& pos) {
     coloringMethod = "loc";
     std::mt19937 rng(seed); 
-    std::uniform_int_distribution<int> dist(0, n); 
+    std::uniform_real_distribution<double> dist(0.0, 1.0);
 
-    int v = dist(rng);
+    // double x = dist(rng);
+    // double y = dist(rng);
+
+    double x = 0.5;
+    double y = 0.5;
 
     std::vector<int> colors;
     for (int i = 0; i < n; ++i) {
 
-        if((abs(pos[i][0]-pos[v][0])<radius || 1-abs(pos[i][0]-pos[v][0])<radius) && (abs(pos[i][1]-pos[v][1])<radius || 1-abs(pos[i][1]-pos[v][1])<radius) ){
+        if((abs(pos[i][0]-x)<radius || 1-abs(pos[i][0]-x)<radius) && (abs(pos[i][1]-y)<radius || 1-abs(pos[i][1]-y)<radius) ){
             colors.push_back(0);
         }else{
             colors.push_back(1);
@@ -80,15 +84,26 @@ void save_graph_to_file(const graph& g, const std::vector<std::vector<double>>& 
 
     auto foldername1 = [&]() {
         std::ostringstream oss;
-        oss << "n=" << num_vertices  << "_tau=" << to_string(tau) << "_a=" << to_string(alpha);
+        oss << "n=" << num_vertices  << "_tau=" << to_string(tau);
         return oss.str();
     }();
     auto foldername2 = [&]() {
         std::ostringstream oss;
-        oss << "col=" << coloringMethod <<  "_seed=" << seed;
+        oss << "a=" << to_string(alpha);
         return oss.str();
     }();
-    auto base_path = "graph_data/" + foldername1 + "/" + foldername2;
+    auto foldername3= [&]() {
+        std::ostringstream oss;
+        oss << "col=" << coloringMethod;
+        return oss.str();
+    }();
+
+    auto foldername4 = [&]() {
+        std::ostringstream oss;
+        oss << "seed=" << seed;
+        return oss.str();
+    }();
+    auto base_path = "graph_data/" + foldername1 + "/" + foldername2 + "/" + foldername3 + "/" + foldername4;
 
     filesystem::create_directories(base_path);
 
@@ -146,9 +161,10 @@ void single_vertex_all_neighbours(graph& g, const std::vector<std::vector<double
     }
 
     int iter = 0;
-    if(coloringMethod=="heavy"){
+    if(coloringMethod=="loc"){
         save_graph_to_file(g, pos, weights, col,  neighbour_col, tau, alpha, aseed-4, iter);
     }
+    
 
     while(flipable.size()!=0){
         //Draw new vertices until one 
@@ -202,17 +218,20 @@ int main()
 {
     int n = 10000;
     vector<int> iterations = {};
-    for(int j=1; j< 2; j++){
+    for(int j=0; j< 1; j++){
+    std::vector<double> values = {1.3};
+    for (double a : values){
     for(int i=99; i<100; i++){
 
         int dim = 2;
         double tau = 200+i;
         tau = tau/100;
-        double alpha = 2;
+        double alpha = a;
         //int deg = 3;
         //1804289383
         auto time_now = std::chrono::system_clock::now().time_since_epoch().count();
         int pseed = abs(static_cast<int>(time_now & 0xFFFFFFFF));
+        pseed = 1000518664;
         cout << "Base Randomness " << pseed << endl;
 
         int wseed = pseed+1;
@@ -244,8 +263,8 @@ int main()
 
         vector<int> col;
         switch(j){
-            case 0: col = generate_colors_random(n, cseed); break;
-            case 1: col = generate_colors_location(n, cseed, 0.25, pos); break;
+            case 1: col = generate_colors_random(n, cseed); break;
+            case 0: col = generate_colors_location(n, cseed, 0.25, pos); break;
         }
         vector<int>  neighbour_col(boost::num_vertices(g), 0);
         for(int v=0; v < boost::num_vertices(g); v++){
@@ -267,6 +286,7 @@ int main()
 
         single_vertex_all_neighbours(g, pos, weights, col, neighbour_col, iterations, tau, alpha, aseed);
 
+    }
     }
     }
 
