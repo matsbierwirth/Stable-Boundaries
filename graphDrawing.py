@@ -35,11 +35,15 @@ def read_graph_from_file(filepath):
         pos = (float(vertex_data[1]), float(vertex_data[2]))
         weight = float(vertex_data[3])
         color = int(vertex_data[4])
+        neighbour_color = int(vertex_data[5])
+        degree = int(vertex_data[6])
         vertices.append({
             "index": vertex_index,
             "pos": pos,
             "weight": weight,
-            "color": color
+            "color": color,
+            "neighbour_col": neighbour_color,
+            "degree": degree
         })
 
     # Read edge data
@@ -80,9 +84,21 @@ def draw_graph(graph_data, split_path):
     plt.figure(figsize=(6.4, 6.4))
     # Prepare data for plotting
     positions = {v["index"]: v["pos"] for v in vertices}
-    weights = {v["index"]: v["weight"] for v in vertices}
-    colors = {v["index"]: v["color"] for v in vertices}
     
+
+    col= []
+    for vertex in vertices:
+        if vertex["degree"] == 0:
+            red =(vertex["color"])%2
+            blue =(vertex["color"]+1)%2
+
+            col.append((red, 0, blue))
+        else:
+            red = max(0, min(1, (0.2*((vertex["color"])%2) +0.8*(vertex["degree"]+vertex["neighbour_col"])/(2*vertex["degree"]))))
+            blue =max(0, min(1, (0.2*((vertex["color"]+1)%2)+ +0.8*(vertex["degree"]-vertex["neighbour_col"])/(2*vertex["degree"]))))
+
+            col.append((red, 0, blue))
+
     # Plot edges
     edge_segments = []
     edge_colors = []
@@ -111,12 +127,9 @@ def draw_graph(graph_data, split_path):
         edge_segments.append([(x1, y1), (x2, y2)])
         
         # Determine edge color
-        if colors[src] == 0 and colors[dest] == 0:
-            edge_colors.append("red")
-        elif colors[src] == 1 and colors[dest] == 1:
-            edge_colors.append("blue")
-        else:
-            edge_colors.append("black")
+        red = max(0, min(1, (col[src][0]+col[dest][0])/2))
+        blue = max(0, min(1, (col[src][2]+col[dest][2])/2))
+        edge_colors.append((red, 0, blue))
         
         # Add wrapped edge if necessary
         if wrapped_x or wrapped_y:
@@ -128,7 +141,7 @@ def draw_graph(graph_data, split_path):
                 y2 -= 1.0
             edge_segments.append([(x1, y1), (x2, y2)])
             edge_colors.append(edge_colors[-1])  # Same color as the original edge
-
+    #print(edge_colors)
     # Use LineCollection to draw edges
     lc = LineCollection(edge_segments, colors=edge_colors, linewidths=0.05, linestyles='-')
     plt.gca().add_collection(lc)
@@ -138,10 +151,12 @@ def draw_graph(graph_data, split_path):
     y_coords = [vertex["pos"][1] for vertex in vertices]
     sizes = [max(0.2,math.log(vertex["weight"])**tau) for vertex in vertices]
     #print(min(sizes), max(sizes))
-    colors = ["red" if vertex["color"] == 0 else "blue" for vertex in vertices]
 
+    
+
+    #print(colors)
     # Use scatter to plot vertices
-    plt.scatter(x_coords, y_coords, s=sizes, c=colors, marker=".", linewidths=0.5, zorder=2)
+    plt.scatter(x_coords, y_coords, s=sizes, c=col, marker=".", linewidths=0.5, zorder=2)
     
     # Adjust axes for the torus
     plt.xlim(0.0, 1.0)

@@ -73,7 +73,7 @@ void draw_graph(string filename){
 }
 
 void save_graph_to_file(const graph& g, const std::vector<std::vector<double>>& pos, const std::vector<double>& weights, const std::vector<int>& colors,
-                    double tau, double alpha, int seed, int iter) {
+                    const std::vector<int>& neighbour_col, double tau, double alpha, int seed, int iter) {
 
     auto num_vertices = boost::num_vertices(g);
     auto num_edges = boost::num_edges(g);
@@ -111,7 +111,9 @@ void save_graph_to_file(const graph& g, const std::vector<std::vector<double>>& 
              << pos[i][0] << " " 
              << pos[i][1] << " " 
              << weights[i] << " " 
-             << colors[i] << "\n";
+             << colors[i] << " "
+             << neighbour_col[i] << " "
+             << degree(i, g) <<"\n";
     }
 
     // Write edge data
@@ -127,7 +129,7 @@ void save_graph_to_file(const graph& g, const std::vector<std::vector<double>>& 
 }
 
 void single_vertex_all_neighbours(graph& g, const std::vector<std::vector<double>>& pos, const std::vector<double>& weights, 
-                                std::vector<int> col, std::vector<int> neighbour_col, std::vector<int> iterations, 
+                                std::vector<int>& col, std::vector<int>& neighbour_col, std::vector<int>& iterations, 
                                 double tau, double alpha, int aseed) {
     std::mt19937 rng(aseed); 
     std::uniform_int_distribution<int> vertex_dist(0, boost::num_vertices(g) - 1);
@@ -144,7 +146,9 @@ void single_vertex_all_neighbours(graph& g, const std::vector<std::vector<double
     }
 
     int iter = 0;
-    save_graph_to_file(g, pos, weights, col, tau, alpha, aseed-4, iter);
+    if(coloringMethod=="heavy"){
+        save_graph_to_file(g, pos, weights, col,  neighbour_col, tau, alpha, aseed-4, iter);
+    }
 
     while(flipable.size()!=0){
         //Draw new vertices until one 
@@ -182,14 +186,14 @@ void single_vertex_all_neighbours(graph& g, const std::vector<std::vector<double
 
             //cout << flipable.size() << endl;
             if (std::find(iterations.begin(), iterations.end(), iter) != iterations.end()) {
-                save_graph_to_file(g, pos, weights, col, tau, alpha, aseed-4, iter);
+                save_graph_to_file(g, pos, weights, col, neighbour_col, tau, alpha, aseed-4, iter);
             }
         }
 
         
         
     }
-    save_graph_to_file(g, pos, weights, col, tau, alpha, aseed-4, iter);
+    save_graph_to_file(g, pos, weights, col, neighbour_col, tau, alpha, aseed-4, iter);
     cout << "No changes are possible after iteration " << iter << ". Program terminates." << endl;
 
 }
@@ -197,13 +201,13 @@ void single_vertex_all_neighbours(graph& g, const std::vector<std::vector<double
 int main()
 {
     int n = 10000;
-    //vector<int> iterations = {1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000};
     vector<int> iterations = {};
-    for(int i=999; i<1000; i++){
+    for(int j=1; j< 2; j++){
+    for(int i=99; i<100; i++){
 
         int dim = 2;
-        double tau = 2000+i;
-        tau = tau/1000;
+        double tau = 200+i;
+        tau = tau/100;
         double alpha = 2;
         //int deg = 3;
         //1804289383
@@ -237,9 +241,12 @@ int main()
             boost::add_edge(e.first, e.second, g); 
         }
         cout << "Edge count " << edges.size() << endl;
-        vector<int> col = generate_colors_location(n, cseed, 0.25, pos);
 
-
+        vector<int> col;
+        switch(j){
+            case 0: col = generate_colors_random(n, cseed); break;
+            case 1: col = generate_colors_location(n, cseed, 0.25, pos); break;
+        }
         vector<int>  neighbour_col(boost::num_vertices(g), 0);
         for(int v=0; v < boost::num_vertices(g); v++){
             adj_it neighbor_start, neighbor_end;
@@ -260,6 +267,7 @@ int main()
 
         single_vertex_all_neighbours(g, pos, weights, col, neighbour_col, iterations, tau, alpha, aseed);
 
+    }
     }
 
 }
