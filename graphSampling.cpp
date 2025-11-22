@@ -70,6 +70,38 @@ vector<int> generate_colors_location(int n, int seed, double radius, const std::
     return colors;
 }
 
+vector<int> generate_colors_strip(int n, const std::vector<std::vector<double>>& pos) {
+    coloringMethod = "strip";
+
+    std::vector<int> colors;
+    for (int i = 0; i < n; ++i) {
+
+        if(pos[i][0]<0.5){
+            colors.push_back(0);
+        }else{
+            colors.push_back(1);
+        }
+    }
+    return colors;
+}
+
+vector<int> generate_colors_circ(int n, double radius, const std::vector<std::vector<double>>& pos) {
+    coloringMethod = "circ";
+    double x = 0.5;
+    double y = 0.5;
+
+    std::vector<int> colors;
+    for (int i = 0; i < n; ++i) {
+
+        if((pos[i][0]-x)*(pos[i][0]-x) + (pos[i][1]-y)*(pos[i][1]-y) <radius*radius){
+            colors.push_back(0);
+        }else{
+            colors.push_back(1);
+        }
+    }
+    return colors;
+}
+
 
 void draw_graph(string filename){
     std::string command = "python3.11 graphDrawing.py " +  filename;
@@ -77,7 +109,7 @@ void draw_graph(string filename){
 }
 
 void save_graph_to_file(const graph& g, const std::vector<std::vector<double>>& pos, const std::vector<double>& weights, const std::vector<int>& colors,
-                    const std::vector<int>& neighbour_col, double tau, double alpha, int seed, int iter) {
+                    const std::vector<int>& neighbour_col, double tau, double alpha, int seed, int iter, bool colorless) {
 
     auto num_vertices = boost::num_vertices(g);
     auto num_edges = boost::num_edges(g);
@@ -118,7 +150,7 @@ void save_graph_to_file(const graph& g, const std::vector<std::vector<double>>& 
         return;
     }
     // Write the first line: number of vertices, edges, timestep, seed
-    file << num_vertices << " " << num_edges << " " << tau << " " << alpha << " " << seed << " " << iter << " " <<  "\n";
+    file << num_vertices << " " << num_edges << " " << tau << " " << alpha << " " << seed << " " << iter << " " << int(colorless) << "\n";
     
     // Write vertex data
     for (int i=0; i< num_vertices; i++) {
@@ -143,7 +175,7 @@ void save_graph_to_file(const graph& g, const std::vector<std::vector<double>>& 
     draw_graph(file_path);
 }
 
-void single_vertex_all_neighbours(graph& g, const std::vector<std::vector<double>>& pos, const std::vector<double>& weights, 
+int single_vertex_all_neighbours(graph& g, const std::vector<std::vector<double>>& pos, const std::vector<double>& weights, 
                                 std::vector<int>& col, std::vector<int>& neighbour_col, std::vector<int>& iterations, 
                                 double tau, double alpha, int aseed) {
     std::mt19937 rng(aseed); 
@@ -161,9 +193,9 @@ void single_vertex_all_neighbours(graph& g, const std::vector<std::vector<double
     }
 
     int iter = 0;
-    if(coloringMethod=="loc"){
-        save_graph_to_file(g, pos, weights, col,  neighbour_col, tau, alpha, aseed-4, iter);
-    }
+    
+    //save_graph_to_file(g, pos, weights, col,  neighbour_col, tau, alpha, aseed-4, iter, true);
+    //save_graph_to_file(g, pos, weights, col,  neighbour_col, tau, alpha, aseed-4, iter, false);
     
 
     while(flipable.size()!=0){
@@ -202,37 +234,131 @@ void single_vertex_all_neighbours(graph& g, const std::vector<std::vector<double
 
             //cout << flipable.size() << endl;
             if (std::find(iterations.begin(), iterations.end(), iter) != iterations.end()) {
-                save_graph_to_file(g, pos, weights, col, neighbour_col, tau, alpha, aseed-4, iter);
+                //save_graph_to_file(g, pos, weights, col,  neighbour_col, tau, alpha, aseed-4, iter, false);
             }
         }
 
         
         
     }
-    save_graph_to_file(g, pos, weights, col, neighbour_col, tau, alpha, aseed-4, iter);
+    save_graph_to_file(g, pos, weights, col, neighbour_col, tau, alpha, aseed-4, iter, false);
+
+
+
+
+    int count =0;
+    for(int j=0; j<col.size(); j++){
+        if(col[j]==0){
+            count+=1;
+        }
+        
+    }
+    //cout << "No changes are possible after iteration " << iter << ". Program terminates." << endl;
+    return count;
+}
+
+
+void all_vertex_all_neighbours(graph& g, const std::vector<std::vector<double>>& pos, const std::vector<double>& weights, 
+                                std::vector<int>& col, std::vector<int>& neighbour_col, std::vector<int>& iterations, 
+                                double tau, double alpha, int aseed) {
+    std::mt19937 rng(aseed); 
+    std::uniform_int_distribution<int> vertex_dist(0, boost::num_vertices(g) - 1);
+
+
+    set<int> flipable;
+    for(int j=0; j<neighbour_col.size(); j++){
+        if((neighbour_col[j]<0 && col[j] == 1) || (neighbour_col[j]>0 && col[j] == 0)){
+            flipable.insert(j);
+        }
+    }
+
+    int iter = 0;
+    
+    save_graph_to_file(g, pos, weights, col,  neighbour_col, tau, alpha, aseed-4, iter, false);
+    
+
+    set<int> prev_flipable1, prev_flipable2;
+
+    while(flipable.size()!=0){
+        iter+=1;
+        prev_flipable2 = prev_flipable1;
+        prev_flipable1 = flipable;
+
+        for (int v : flipable){
+            int change = abs(col[v]-1) -col[v];
+            adj_it neighbor_start, neighbor_end;
+            std::tie(neighbor_start, neighbor_end) = boost::adjacent_vertices(v, g);
+            std::vector<int> neighbors(neighbor_start, neighbor_end);
+            
+            for(int neighbour : neighbors){
+                
+                bool wasFlip = false;
+                if((neighbour_col[neighbour]<0 && col[neighbour] == 1) || (neighbour_col[neighbour]>0 && col[neighbour] == 0)){
+                    wasFlip=true;
+                }
+
+                neighbour_col[neighbour]+=2*change;
+            }
+
+            col[v]+=change;
+        }
+
+
+        flipable.clear();
+        for(int j=0; j<neighbour_col.size(); j++){
+            if((neighbour_col[j]<0 && col[j] == 1) || (neighbour_col[j]>0 && col[j] == 0)){
+                flipable.insert(j);
+            }
+        }
+        if (flipable == prev_flipable2) {
+            cout << "Cycle of length 2 detected at iteration " << iter << ". Terminating." << endl;
+            break;
+        }
+
+        if (std::find(iterations.begin(), iterations.end(), iter) != iterations.end()) {
+                save_graph_to_file(g, pos, weights, col, neighbour_col, tau, alpha, aseed-4, iter, false);
+        }
+        
+
+        
+        
+    }
+    save_graph_to_file(g, pos, weights, col, neighbour_col, tau, alpha, aseed-4, iter, false);
     cout << "No changes are possible after iteration " << iter << ". Program terminates." << endl;
 
 }
 
+
+
+
+
 int main()
 {
     int n = 10000;
+    
     vector<int> iterations = {};
+    vector<double> taus = {2.5};
+    for(double tau : taus){
+    vector<int> survived;
     for(int j=0; j< 1; j++){
-    std::vector<double> values = {1.3};
+    std::vector<double> values = {1000000};
     for (double a : values){
+    for(int k=31; k<=32; k++){
+        
+        survived.push_back(0);
+        cout << tau << " Iteration " << k << endl;
     for(int i=99; i<100; i++){
-
+        
         int dim = 2;
-        double tau = 200+i;
-        tau = tau/100;
         double alpha = a;
+        double s = k;
+        s = s/100;
         //int deg = 3;
         //1804289383
         auto time_now = std::chrono::system_clock::now().time_since_epoch().count();
         int pseed = abs(static_cast<int>(time_now & 0xFFFFFFFF));
-        pseed = 1000518664;
-        cout << "Base Randomness " << pseed << endl;
+        //pseed =229735739;
+        //cout << "Base Randomness " << pseed << endl;
 
         int wseed = pseed+1;
         int sseed = wseed+1;
@@ -241,17 +367,20 @@ int main()
 
 
         auto pos = generatePositions(n, dim, pseed);
-        cout << "pos done" << endl;
+        //cout << "pos done" << endl;
         
         auto weights = generateWeights(n, tau, wseed);
+        
+        //Scale weights such that average degree aligns
+        auto average_deg = pow(2, dim) * pow(tau-1, 2) / pow(tau-2, 2);
+        scaleWeights(weights, average_deg, dim, alpha);
 
-
-        cout << "weights done" << endl;
+        //cout << "weights done" << endl;
         /*for(int i=0; i<n; i++){
             cout  << pos[i][0] << ", "<< pos[i][1] << ", " << weights[i] << endl;
         }*/
-        cout << endl;
-        //auto s = scaleWeights(weights, deg, dim, alpha);
+        //cout << endl;
+        //auto s = 
         auto edges = generateEdges(weights, pos, alpha, sseed);
         
         //return 0; 
@@ -259,12 +388,13 @@ int main()
         for(auto e : edges){
             boost::add_edge(e.first, e.second, g); 
         }
-        cout << "Edge count " << edges.size() << endl;
+        //cout << "Edge count " << edges.size() << endl;
 
         vector<int> col;
         switch(j){
-            case 1: col = generate_colors_random(n, cseed); break;
-            case 0: col = generate_colors_location(n, cseed, 0.25, pos); break;
+            case 0: col = generate_colors_random(n, cseed); break;
+            case 1: col = generate_colors_circ(n, 0.23, pos); break;
+            case 2: col = generate_colors_location(n, cseed, s, pos); break;
         }
         vector<int>  neighbour_col(boost::num_vertices(g), 0);
         for(int v=0; v < boost::num_vertices(g); v++){
@@ -284,10 +414,31 @@ int main()
             }
         }
 
-        single_vertex_all_neighbours(g, pos, weights, col, neighbour_col, iterations, tau, alpha, aseed);
+        int count = single_vertex_all_neighbours(g, pos, weights, col, neighbour_col, iterations, tau, alpha, aseed);
+        if(count>3*n*s*s){
+            survived[survived.size()-1]+=1;
+        }
+    }
+    cout << survived[survived.size()-1] << "/100"  << endl;
+    }
 
     }
     }
+    string base_path = "graph_survival/";
+
+    filesystem::create_directories(base_path);
+
+
+    auto filename = "survivalTau=" + to_string(tau) +".txt";
+
+    auto file_path = base_path + filename;
+
+    std::ofstream file(file_path);
+    for (int i=0; i< survived.size(); i++) {
+        file << i+1 << ": " 
+             << survived[i] <<"/100\n";
     }
 
+    file.close();
+}
 }
