@@ -1,6 +1,6 @@
 # Stable-Boundaries
 
-Code to generate and visualize an opinion-evolution process on GIRGs (Geometric Inhomogeneous Random Graphs), with an emphasis on “stable boundary” configurations and survival-style summaries.
+Code to generate and visualize opinion-dynamics on GIRGs (Geometric Inhomogeneous Random Graphs), with an emphasis on stable configurations.
 
 Repository contents include:
 - A C++ sampler that produces graph instances and runs differnet types of opinion dynamics.
